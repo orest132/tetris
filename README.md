@@ -1,8 +1,7 @@
 # tetris
 
 Used to move:
-**w**
-a*s*d
+w-a-s-d
 
 Used to rotate:
 c and v
