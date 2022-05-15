@@ -1,0 +1,425 @@
+<!doctype html>
+<html>
+   <head>
+      <meta charset = "utf-8">
+      <title>BabylonJs</title>
+      <script type = "text/javascript" src="https://cdn.babylonjs.com/Oimo.js"></script>
+      <script src = "babylon.js"></script>	
+      <style>
+         canvas {width: 100%; height: 100%;}
+      </style>
+   </head>
+
+   <body>
+      <canvas id = "renderCanvas"></canvas>
+      <script type = "text/javascript">
+         var canvas = document.getElementById("renderCanvas");
+         var engine = new BABYLON.Engine(canvas, true);
+         var v3 = BABYLON.Vector3;
+         var current_mesh_being_delt; var tetris_objects = []; var mesh_group=[]; var block_size = 8.0;  var done_rotating_on_one_side=false; var group_nr; drop_height=12*block_size;
+
+         var field =[];
+         
+         //declare and fill 3d array with 0 to act as a container tetris objects
+         for(var o=0;o<12;o++){
+            t=[];
+            field.push(t);
+            for(var p=0;p<7;p++){
+               t1=[]
+               field[o].push(t1);
+               for(var q=0;q<7;q++){
+                  field[o][p].push(0);
+               }
+            }
+         }
+
+         var createScene = function () {	
+            var scene = new BABYLON.Scene(engine);
+
+            var camera = new BABYLON.ArcRotateCamera("Camera", 0.86, 1.37, 250, BABYLON.Vector3.Zero(), scene);
+            
+            camera.attachControl(canvas);
+            camera.maxZ = 5000;
+            camera.lowerRadiusLimit = 20;
+            camera.upperRadiusLimit = 430;
+            camera.lowerBetaLimit =0.75;
+            camera.upperBetaLimit =2.58 ;
+
+            new BABYLON.HemisphericLight("hemi", new BABYLON.Vector3(0, 1, 0), scene);
+
+            
+
+            var mat = new BABYLON.StandardMaterial("ground", scene);
+            mat.specularColor = BABYLON.Color3.Black();
+            
+            var g = BABYLON.Mesh.CreateBox("ground", 58, scene);
+            
+            g.position.y = -20;
+            g.position.x = 0
+            g.scaling.y = 0.01;
+            g.material = mat;	
+
+            scene.enablePhysics(new BABYLON.Vector3(0, -10, 0), new BABYLON.OimoJSPlugin());
+            tetris_objects.push(g);
+
+            if(current_mesh_being_delt===undefined || current_mesh_being_delt.position.y==-10){
+               mesh_group=create_group(Math.floor(randomNumber(1,7)));
+            }
+
+            
+            g.physicsImpostor = new BABYLON.PhysicsImpostor(g, BABYLON.PhysicsImpostor.BoxImpostor, { 
+               mass: 0, 
+               restitution: 0.9 
+            }, scene);
+            
+
+            
+            return scene;
+         };
+
+         //tetris objects will be boxes and groups are made of boxes that move together
+         function create_group(nr){
+            
+            var mesh_group=new Array(4);
+            for(let i=0;i<4;i++){
+                mesh_group[i] = BABYLON.Mesh.CreateBox("box", block_size, scene);
+            }
+
+            mesh_group[0].position = new BABYLON.Vector3(0, drop_height, 0);
+            mesh_group[1].position = new BABYLON.Vector3(0, drop_height-block_size, 0);
+
+            if(nr==1){
+                mesh_group[1].position = new BABYLON.Vector3(-block_size, drop_height, 0);
+                mesh_group[2].position = new BABYLON.Vector3(block_size, drop_height, 0);
+                mesh_group[3].position = new BABYLON.Vector3(2*block_size, drop_height, 0);
+            }
+            else if(nr==2){
+                mesh_group[2].position = new BABYLON.Vector3(block_size, drop_height-block_size, 0);
+                mesh_group[3].position = new BABYLON.Vector3(2*block_size, drop_height-block_size, 0);
+            }
+            else if(nr==3){
+                mesh_group[2].position = new BABYLON.Vector3(-block_size, drop_height-block_size, 0);
+                mesh_group[3].position = new BABYLON.Vector3(-(2*block_size), drop_height-block_size, 0);
+            }
+            else if(nr==4){
+                mesh_group[2].position = new BABYLON.Vector3(-block_size, drop_height, 0);
+                mesh_group[3].position = new BABYLON.Vector3(-block_size, drop_height-block_size, 0);
+            }
+            else if(nr==5){
+                mesh_group[2].position = new BABYLON.Vector3(-block_size, drop_height, 0);
+                mesh_group[3].position = new BABYLON.Vector3(block_size, drop_height-block_size, 0);
+            }
+            else if(nr==6){
+                mesh_group[2].position = new BABYLON.Vector3(block_size, drop_height-block_size, 0);
+                mesh_group[3].position = new BABYLON.Vector3(-block_size, drop_height-block_size, 0);
+            }
+            else{
+                mesh_group[2].position = new BABYLON.Vector3(block_size, drop_height, 0);
+                mesh_group[3].position = new BABYLON.Vector3(-block_size, drop_height-block_size, 0);
+            }
+
+            group_nr = nr;
+            return mesh_group;
+         }
+
+         function rotate_helper(pivot_index){
+            var pivot = mesh_group[pivot_index];
+            for(let i=0;i<4;i++){
+                  if(pivot_index!=i){
+                     if(pivot.position.x==mesh_group[i].position.x){
+                        var offset=pivot.position.y - (mesh_group[i].position.y);
+                        mesh_group[i].position.x=pivot.position.x-offset;
+                        mesh_group[i].position.y=pivot.position.y;
+                     }
+                     else if(pivot.position.y==mesh_group[i].position.y){
+                        var offset=pivot.position.x - (mesh_group[i].position.x);
+                        mesh_group[i].position.x=pivot.position.x;
+                        mesh_group[i].position.y=pivot.position.y+offset;
+                     }
+                     else{
+                        var offset=pivot.position.x - (mesh_group[i].position.x);
+                        mesh_group[i].position.x=mesh_group[i].position.x+(2*offset);
+                     }
+                  }
+               }
+         }
+
+         function rotate_helper_z(pivot_index){
+            var pivot = mesh_group[pivot_index];
+            for(let i=0;i<4;i++){
+                  if(pivot_index!=i){
+                     if(pivot.position.z==mesh_group[i].position.z){
+                        var offset=pivot.position.y - (mesh_group[i].position.y);
+                        mesh_group[i].position.z=pivot.position.z-offset;
+                        mesh_group[i].position.y=pivot.position.y;
+                     }
+                     else if(pivot.position.y==mesh_group[i].position.y){
+                        var offset=pivot.position.z - (mesh_group[i].position.z);
+                        mesh_group[i].position.z=pivot.position.z;
+                        mesh_group[i].position.y=pivot.position.y+offset;
+                     }
+                     else{
+                        var offset=pivot.position.z - (mesh_group[i].position.z);
+                        mesh_group[i].position.z=mesh_group[i].position.z+(2*offset);
+                     }
+                  }
+               }
+         }
+
+         function rotate_right(nr){
+            if(nr==1){
+               var pivot_index=1;
+               rotate_helper(pivot_index);
+            }
+            else if(nr==2){
+               var pivot_index=1;
+               rotate_helper(pivot_index);
+            }
+            else if(nr==3){
+               var pivot_index=1;
+               rotate_helper(pivot_index);
+            }
+            else if(nr==4){
+            }
+            else if(nr==5){
+               var pivot_index=0;
+               rotate_helper(pivot_index);
+            }
+            else if(nr==6){
+               var pivot_index=1;
+               rotate_helper(pivot_index);
+            }
+            else{
+               var pivot_index=0;
+               rotate_helper(pivot_index);
+            }
+
+         }
+
+         function rotate_right_z(nr){
+            if(nr==1){
+               var pivot_index=1;
+               rotate_helper_z(pivot_index);
+            }
+            else if(nr==2){
+               var pivot_index=1;
+               rotate_helper_z(pivot_index);
+            }
+            else if(nr==3){
+               var pivot_index=1;
+               rotate_helper_z(pivot_index);
+            }
+            else if(nr==4){
+            }
+            else if(nr==5){
+               var pivot_index=0;
+               rotate_helper_z(pivot_index);
+            }
+            else if(nr==6){
+               var pivot_index=1;
+               rotate_helper_z(pivot_index);
+            }
+            else{
+               var pivot_index=0;
+               rotate_helper_z(pivot_index);
+            }
+
+         }
+
+         var bool=false;
+         function update_group(){
+            for(let i=0;i<4;i++){
+                mesh_group[i].position.y-=0.1;
+            }
+
+            var br = false;
+            for(let i=0;i<4;i++){ var k=0;
+                current_mesh_being_delt=mesh_group[i];
+                for(var key in tetris_objects){
+                    var object = tetris_objects[key];
+                    if (current_mesh_being_delt.intersectsMesh(object, true)) {
+                        
+                        //when collide once, make box size smaller to avoid edges and move on
+                        if(bool===true){
+                           for(let j=0;j<4;j++){
+                              var temp=mesh_group[j];
+                              mesh_group[j]=BABYLON.Mesh.CreateBox("box", block_size-0.01, scene);
+                              mesh_group[j].position = new BABYLON.Vector3(temp.position.x, temp.position.y, temp.position.z);
+                              temp.dispose();
+                           }
+                           br=true;
+                           bool=false;
+                           break
+                        }
+                        //when collide twice, return size and fill 3d array with the index in tetris_objects.
+                        for(let j=0;j<4;j++){
+                              var temp=mesh_group[j];
+                              mesh_group[j]=BABYLON.Mesh.CreateBox("box", block_size, scene);
+                              mesh_group[j].position = new BABYLON.Vector3(temp.position.x, temp.position.y, temp.position.z);
+                              temp.dispose();
+                        }
+                        for(let j=0;j<4;j++){
+                           mesh_group[j].position.y+=0.1;
+                           
+                           mesh_group[j].position.y=Math.round(mesh_group[j].position.y);
+                           var index=tetris_objects.length;
+                           field[(mesh_group[j].position.y+16)/8][Math.round((mesh_group[j].position.x+24)/8)][(mesh_group[j].position.z+24)/8]=index;
+                           
+                           tetris_objects.push(mesh_group[j]);
+                        }
+                        
+                        //if the 3d array would be filled properly this would remove the row 
+                        for(var o=0;o<12;o++){
+                           temp_bool=true;
+                              for(var p=0;p<7;p++){
+                                 for(var q=0;q<7;q++){
+                                    if(field[o][p][q]==0)
+                                       temp_bool=false;
+                                 }
+                              }
+                              if(temp_bool==true){
+                                 index_row_el=o;
+                                 for(var o=index_row_el;o<12;o++){
+                                    if(index_row_el==o){
+                                       for(var p=0;p<7;p++){
+                                          for(var q=0;q<7;q++){
+                                             tetris_objects[field[o][p][q]].dispose();
+                                             tetris_objects.splice(field[o][p][q],1);
+                                          }
+                                       }
+                                    }
+                                    if(o==11){
+                                       for(var p=0;p<7;p++){
+                                          for(var q=0;q<7;q++){
+                                             field[o][p][q]=0;
+                                          }
+                                       }
+                                    }
+                                    else{
+                                       for(var p=0;p<7;p++){
+                                          for(var q=0;q<7;q++){
+                                             field[o][p][q]=field[o+1][p][q];
+                                             tetris_objects[field[o][p][q]].position.y-=block_size;
+                                          }
+                                       }
+                                    }
+                                    
+                                 }
+                              }
+                        }
+                        var rand=randomNumber(1,7);
+                        mesh_group=create_group(Math.floor(rand));
+                        br=true;
+                        bool=true;
+                        break
+                        
+                    }
+                }
+                if(br==true)
+                    break
+            }
+         }
+
+         var randomNumber = function (min, max) {
+               if (min == max) {
+                  return (min);
+               }
+               var random = Math.random();
+               return ((random * (max - min)) + min);
+            };
+
+         function move(key){
+            var is_one_invalid=false;
+            if(key=="s"){
+               for(let i=0;i<4;i++){
+                  if((mesh_group[i].position.z+block_size)>26){
+                     is_one_invalid=true;
+                  }
+                     
+               }
+               if(!is_one_invalid){
+                  for(let i=0;i<4;i++){
+                     mesh_group[i].position.z+=(block_size);
+                  }
+               }
+                  
+               is_one_invalid=false;
+            }
+            else if(key=="w"){
+               for(let i=0;i<4;i++){
+                  if(mesh_group[i].position.z-block_size<-26)
+                     is_one_invalid=true;
+               }
+               if(!is_one_invalid){
+                  for(let i=0;i<4;i++){
+                     mesh_group[i].position.z-=block_size;
+                  }
+               }
+                  
+               is_one_invalid=false;
+            }
+            else if(key=="a"){
+               for(let i=0;i<4;i++){
+                  if(mesh_group[i].position.x+block_size>26)
+                     is_one_invalid=true;
+               }
+               if(!is_one_invalid){
+                  for(let i=0;i<4;i++){
+                     mesh_group[i].position.x+=block_size;
+                  }
+               }
+                  
+               is_one_invalid=false;
+            }
+            else if(key=="d"){
+               for(let i=0;i<4;i++){
+                  if(mesh_group[i].position.x-block_size<-26)
+                     is_one_invalid=true;
+               }
+               if(!is_one_invalid){
+                  for(let i=0;i<4;i++){
+                     mesh_group[i].position.x-=block_size;
+                  }
+               }
+                  
+               is_one_invalid=false;
+
+            }
+         }
+
+         function rotate_r(key){
+            if(key=="c"){
+               rotate_right(group_nr);
+            }
+         }
+         function rotate_r_z(key){
+            if(key=="v"){
+               rotate_right_z(group_nr);
+            }
+         }
+
+         var scene = createScene();
+
+         scene.onKeyboardObservable.add((kbInfo) => {
+         switch (kbInfo.type) {
+            case BABYLON.KeyboardEventTypes.KEYDOWN:
+               if(kbInfo.event.key=="p"){
+                  for(let i=0;i<4;i++)
+                  mesh_group[i].position.y-=1;
+               }
+               break;
+            case BABYLON.KeyboardEventTypes.KEYUP:
+               rotate_r(kbInfo.event.key);
+               rotate_r_z(kbInfo.event.key);
+               move(kbInfo.event.key);
+               break;
+         }
+         });
+
+         engine.runRenderLoop(function() {
+            update_group();
+            scene.render();
+         });
+      </script>
+   </body>
+</html>
